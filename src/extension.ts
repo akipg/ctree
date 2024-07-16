@@ -25,7 +25,7 @@ class Callee {
 	pos: Number;
 	desc: String;
 
-	constructor(func:FuncInfo, pos:Number, desc:String) {
+	constructor(func: FuncInfo, pos: Number, desc: String) {
 		this.funcInfo = func;
 		this.pos = pos;
 		this.desc = desc;
@@ -38,7 +38,7 @@ export class TreeViewItem extends vscode.TreeItem {
 		public line: string,
 		public path: string,
 		public readonly collapsibleState: vscode.TreeItemCollapsibleState,
-		public readonly funcInfo:FuncInfo
+		public readonly funcInfo: FuncInfo
 	) {
 		super(label, collapsibleState);
 		this.tooltip = `${this.label}-${this.line}`;
@@ -51,17 +51,17 @@ export class TreeViewItem extends vscode.TreeItem {
 
 
 export class CtreeProvider implements vscode.TreeDataProvider<TreeViewItem> {
-	
-	constructor(private workspaceRoot?: string) { 
+
+	constructor(private workspaceRoot?: string) {
 		ctreeViewProvider = this;
 	}
 
 	private _onDidChangeTreeData: vscode.EventEmitter<TreeViewItem | undefined | null | void> = new vscode.EventEmitter<TreeViewItem | undefined | null | void>();
-  	readonly onDidChangeTreeData: vscode.Event<TreeViewItem | undefined | null | void> = this._onDidChangeTreeData.event;
+	readonly onDidChangeTreeData: vscode.Event<TreeViewItem | undefined | null | void> = this._onDidChangeTreeData.event;
 
-  	refresh(): void {
-    	this._onDidChangeTreeData.fire();
-  	}
+	refresh(): void {
+		this._onDidChangeTreeData.fire();
+	}
 
 	getTreeItem(element: TreeViewItem): vscode.TreeItem {
 		return element;
@@ -75,36 +75,36 @@ export class CtreeProvider implements vscode.TreeDataProvider<TreeViewItem> {
 
 		if (element) {
 			return Promise.resolve(this.getFuncInfo(element.funcInfo));
-		} 
+		}
 		return Promise.resolve(this.getFuncInfo());
 	}
 
 	/**
 	 * Given the path to package.json, read all its dependencies and devDependencies.
 	 */
-	private getFuncInfo(func?:FuncInfo): TreeViewItem[] {
-		let res:Array<TreeViewItem> = <TreeViewItem[]>[];
+	private getFuncInfo(func?: FuncInfo): TreeViewItem[] {
+		let res: Array<TreeViewItem> = <TreeViewItem[]>[];
 
 		if (func == null) {
 			rootGraph.forEach(element => {
-				let item:TreeViewItem = new TreeViewItem(element.funcName, '', element.fileName, vscode.TreeItemCollapsibleState.Collapsed, element);
+				let item: TreeViewItem = new TreeViewItem(element.funcName, '', element.fileName, vscode.TreeItemCollapsibleState.Collapsed, element);
 				res.push(item);
 			});
 		}
 		else {
 			func.callee.forEach(element => {
-				let item:TreeViewItem = new TreeViewItem(element.funcInfo.funcName, element.pos.toString(), func.fileName, vscode.TreeItemCollapsibleState.Collapsed, element.funcInfo);
+				let item: TreeViewItem = new TreeViewItem(element.funcInfo.funcName, element.pos.toString(), func.fileName, vscode.TreeItemCollapsibleState.Collapsed, element.funcInfo);
 				res.push(item);
 			});
 		}
 		return res;
 	}
 
-	
+
 }
 
 let ctreeViewProvider: CtreeProvider;
-  
+
 
 
 
@@ -164,7 +164,7 @@ export function getWord() {
 				}
 			}
 			const text = editor.document.getText(editor.selection);
-			resolve (text);
+			resolve(text);
 		});
 	});
 }
@@ -175,7 +175,7 @@ interface Dictionary<T> {
 	[Key: string]: T;
 }
 
-let dFunctions:Dictionary<FuncInfo>;
+let dFunctions: Dictionary<FuncInfo>;
 
 
 export function decodeLine(line: string): FuncInfo {
@@ -191,25 +191,25 @@ export function decodeCaller(line: string): Callee {
 }
 */
 
-export async function buildGraph(funcName:string, rootArray:Array<FuncInfo>) {
+export async function buildGraph(funcName: string, rootArray: Array<FuncInfo>) {
 
 	let definition = await doCLI(`cscope -d -fcscope.out -L1 ${funcName} `);
 	let base = decodeLine(definition as string);
 	dFunctions[base.funcName] = base;
 
 	// Find caller functions
-	let data:string = await doCLI(`cscope -d -fcscope.out -L3 ${funcName} `) as string;
+	let data: string = await doCLI(`cscope -d -fcscope.out -L3 ${funcName} `) as string;
 	// If no caller it means it is root.
 	let lines = data.split('\n');
-	if(lines.length <= 1) {
+	if (lines.length <= 1) {
 		rootArray.push(base);
 		return;
 	}
 
-	for(let i:number = 0; i < lines.length; i++) {
+	for (let i: number = 0; i < lines.length; i++) {
 		let line = lines[i];
-		let info:FuncInfo;
-		if(line.length > 3) {
+		let info: FuncInfo;
+		if (line.length > 3) {
 			let tempCaller = decodeLine(line);
 			let caller = dFunctions[tempCaller.funcName];
 			if (caller == null) {
@@ -218,58 +218,56 @@ export async function buildGraph(funcName:string, rootArray:Array<FuncInfo>) {
 			}
 			let callee = new Callee(dFunctions[base.funcName], tempCaller.pos, tempCaller.desc);
 			caller.callee.push(callee);
-			
+
 		}
 
 	};
 	return;
 }
 
-let rootGraph:Array<FuncInfo> = <FuncInfo[]>[];
+let rootGraph: Array<FuncInfo> = <FuncInfo[]>[];
 
-export function showTree(offset:string, funcInfo:FuncInfo) {
-	console.log(offset + ' ' +  funcInfo.funcName);
+export function showTree(offset: string, funcInfo: FuncInfo) {
+	console.log(offset + ' ' + funcInfo.funcName);
 	funcInfo.callee.forEach(callee => {
 		showTree(offset + '+', callee.funcInfo);
 	});
 }
 
-export function gotoDef(node:TreeViewItem) {
+export function gotoDef(node: TreeViewItem) {
 	let dir = getRoot();
 	const uriref: vscode.Uri = vscode.Uri.file(dir + '/' + node.funcInfo.fileName);
-        vscode.workspace.openTextDocument(uriref).then(doc => {
-            vscode.window.showTextDocument(doc ).then(() => {
-				const line: number = node.funcInfo.pos;
-				if (vscode.window.activeTextEditor == null)
-					return;
-                let reviewType: vscode.TextEditorRevealType = vscode.TextEditorRevealType.InCenter;
-        		if (line === vscode.window.activeTextEditor.selection.active.line) {
-            		reviewType = vscode.TextEditorRevealType.InCenterIfOutsideViewport;
-        		}
-        		const newSe = new vscode.Selection(line, 0, line, 0);
-        		vscode.window.activeTextEditor.selection = newSe;
-        		vscode.window.activeTextEditor.revealRange(newSe, reviewType);
-            });
-        });
+	vscode.workspace.openTextDocument(uriref).then(doc => {
+		vscode.window.showTextDocument(doc).then(() => {
+			const line: number = node.funcInfo.pos;
+			if (vscode.window.activeTextEditor == null) { return; }
+			let reviewType: vscode.TextEditorRevealType = vscode.TextEditorRevealType.InCenter;
+			if (line === vscode.window.activeTextEditor.selection.active.line) {
+				reviewType = vscode.TextEditorRevealType.InCenterIfOutsideViewport;
+			}
+			const newSe = new vscode.Selection(line, 0, line, 0);
+			vscode.window.activeTextEditor.selection = newSe;
+			vscode.window.activeTextEditor.revealRange(newSe, reviewType);
+		});
+	});
 }
 
-export function gotoLine(node:TreeViewItem) {
+export function gotoLine(node: TreeViewItem) {
 	let dir = getRoot();
 	const uriref: vscode.Uri = vscode.Uri.file(dir + '/' + node.path);
-        vscode.workspace.openTextDocument(uriref).then(doc => {
-            vscode.window.showTextDocument(doc ).then(() => {
-				const line: number = parseInt(node.line);
-				if (vscode.window.activeTextEditor == null)
-					return;
-                let reviewType: vscode.TextEditorRevealType = vscode.TextEditorRevealType.InCenter;
-        		if (line === vscode.window.activeTextEditor.selection.active.line) {
-            		reviewType = vscode.TextEditorRevealType.InCenterIfOutsideViewport;
-        		}
-        		const newSe = new vscode.Selection(line - 1 , 0, line - 1, 0);
-        		vscode.window.activeTextEditor.selection = newSe;
-        		vscode.window.activeTextEditor.revealRange(newSe, reviewType);
-            });
-        });
+	vscode.workspace.openTextDocument(uriref).then(doc => {
+		vscode.window.showTextDocument(doc).then(() => {
+			const line: number = parseInt(node.line);
+			if (vscode.window.activeTextEditor == null) { return; }
+			let reviewType: vscode.TextEditorRevealType = vscode.TextEditorRevealType.InCenter;
+			if (line === vscode.window.activeTextEditor.selection.active.line) {
+				reviewType = vscode.TextEditorRevealType.InCenterIfOutsideViewport;
+			}
+			const newSe = new vscode.Selection(line - 1, 0, line - 1, 0);
+			vscode.window.activeTextEditor.selection = newSe;
+			vscode.window.activeTextEditor.revealRange(newSe, reviewType);
+		});
+	});
 }
 
 export async function findCaller() {
@@ -321,7 +319,7 @@ export function activate(context: vscode.ExtensionContext) {
 	disposable = vscode.commands.registerCommand('ctree.findcaller', findCaller);
 	context.subscriptions.push(disposable);
 
-	
+
 	disposable = vscode.commands.registerCommand('ctree.gotodef', gotoDef);
 	context.subscriptions.push(disposable);
 
@@ -330,7 +328,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	//const ctreeProvider = new CtreeProvider();
 	//vscode.window.registerTreeDataProvider('ctreeview', ctreeProvider);
-	vscode.window.createTreeView('ctreeview', {treeDataProvider: new CtreeProvider()});
+	vscode.window.createTreeView('ctreeview', { treeDataProvider: new CtreeProvider() });
 
 }
 
