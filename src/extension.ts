@@ -110,12 +110,12 @@ let ctreeViewProvider: CtreeProvider;
 
 
 export function getRoot(): string {
-	let rFolder: vscode.Uri;
+	let rFolder: string;
 	let folder: string = "";
 
 	// The code you place here will be executed every time your command is executed
 	if (vscode.workspace.workspaceFolders !== undefined) {
-		rFolder = vscode.workspace.workspaceFolders[0].uri;
+		rFolder = vscode.workspace.workspaceFolders[0].uri.fsPath;
 		folder = rFolder.toString();
 		folder = folder.replace('file:', '');
 
